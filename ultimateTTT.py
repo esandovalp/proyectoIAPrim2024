@@ -167,6 +167,7 @@ class GameState:
             print("Error: No moves to undo.")
 
 def main():
+    print("Starting the game!")
     game = GameState()
 
     while not game.check_ultimate_board_win():  # Main game loop
@@ -215,6 +216,7 @@ def print_board(game):
 
 
 def get_human_input():
+    print("Inside get_human_input")
     while True:
         try:
             input_str = input("Enter your move (board, row, col), e.g., 1 2 3: ").split()
