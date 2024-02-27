@@ -199,7 +199,7 @@ def get_human_input():
                 return board_index, row, col
             else:
                 print("Invalid input. Please enter values between 1 and 3.")
-        except (ValueError, IndexError):f
+        except (ValueError, IndexError):
             print("Invalid input format. Please enter three numbers separated by spaces.")
 
 
