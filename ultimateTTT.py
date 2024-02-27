@@ -21,11 +21,15 @@ class GameState:
 
         small_board = self.small_boards[board_index]
 
-        if small_board[row][col] != " ":
+        if small_board[row][col] != 0:
             raise ValueError("Square already occupied")
 
+        print("small board before move", small_board)
+
         # 2. Place the Mark
-        small_board[row][col] = self.current_player
+        small_board[row][col] = 1 if self.current_player == 'X' else -1 
+        
+        print(  "small board after move", small_board)
 
         # 3. Check for Small Board Win and Update Ultimate Board
         small_board_winner = self.check_small_board_win(small_board)
@@ -170,7 +174,7 @@ class GameState:
             print("Error: No moves to undo.")
             
 def print_board(game):
-    symbols = {0: " ", 1: "X", -1: "O"}  # Map for symbols
+    symbols = {0: " ", 1: "X", -1: "O"}  
 
     # Small Boards
     for board_num, small_board in enumerate(game.small_boards):
