@@ -1,245 +1,229 @@
-import sys 
+class TicTacToeBoard:
+    """General board class. Extended by GlobalBoard and LocalBoard"""
 
-def create_board():
-    return [[0 for _ in range(3)] for _ in range(3)]  # 3x3 small board
-
-class GameState:
     def __init__(self):
-        self.ultimate_board = [[0 for _ in range(3)] for _ in range(3)]  # 3x3 large board
-        self.small_boards = [create_board() for _ in range(9)]
-        self.current_player = "X"  # Start with 'X'
-        self.active_board = None  # Where the next move must be made
-        self.move_history = []
+        # 3x3 grid of zeros. Will be set to 1 or 2 when the square is claimed
+        self.board = [[0, 0, 0] for _ in range(3)]
 
-    # Methods for making moves, checking win states, etc. (We'll define these later)
-    def make_move(self, board_index, row, col):
-        # 1. Input Validation
-        if not 0 <= board_index <= 8:
-            raise ValueError("Invalid board index")
-        if not 0 <= row <= 2 or not 0 <= col <= 2:
-            raise ValueError("Invalid row or column")
+    # Does this board have tic tac toe
+    def has_tic_tac_toe(self, player):
+        """Checks if the current board has a tic-tac-toe for the given player"""
+        # Check for horizontal and vertical tic tac toe
+        for x in range(3):
+            # Horizontal tic tac toe
+            if self.board[x][0] == player and self.board[x][0] == self.board[x][1] and self.board[x][0] == self.board[x][2]:
+                return True
+            # Vertical tic tac toe
+            if self.board[0][x] == player and self.board[0][x] == self.board[1][x] and self.board[0][x] == self.board[2][x]:
+                return True
 
-        small_board = self.small_boards[board_index]
+        # Check for negative diagonal tic tac toe
+        if self.board[0][0] == player and self.board[0][0] == self.board[1][1] and self.board[0][0] == self.board[2][2]:
+            return True
 
-        if small_board[row][col] != 0:
-            raise ValueError("Square already occupied")
+        # Check for positive diagonal tic tac toe
+        if self.board[2][0] == player and self.board[2][0] == self.board[1][1] and self.board[2][0] == self.board[0][2]:
+            return True
 
-        print("small board before move", small_board)
+        return False
 
-        # 2. Place the Mark
-        small_board[row][col] = 1 if self.current_player == 'X' else -1 
-        
-        print(  "small board after move", small_board)
+    def is_full(self):
+        """Checks if every space on the board has been played (i.e. there is a draw)"""
+        return not any(0 in row for row in self.board)
 
-        # 3. Check for Small Board Win and Update Ultimate Board
-        small_board_winner = self.check_small_board_win(small_board)
-        # Update ultimate board
-        if small_board_winner:
-            self.ultimate_board[board_index // 3][board_index % 3] = 1 if small_board_winner == 'X' else -1
+    def check_draw_local(self, local_board_index):
+        """Checks if a local board is drawn (i.e., no winner and no playable moves left)"""
+        local_board = self.local_board_list[local_board_index]
+        return not local_board.has_tic_tac_toe(1) and not local_board.has_tic_tac_toe(2) and local_board.is_full() and not self.has_tic_tac_toe(1) and not self.has_tic_tac_toe(2)
 
-        # 4. Update Active Board (For Next Turn)
-        self.active_board = row * 3 + col
-
-        # 5. Switch Players
-        self.current_player = "O" if self.current_player == "X" else "X"
-
-        # Add move to history
-        self.move_history.append((board_index, row, col, self.current_player))  # Store previous player
+    def check_draw_global(self):
+        """Checks if the global board is drawn (i.e., all local boards are drawn or not playable)"""
+        return all(self.check_draw_local(i) or not self.local_board_list[i].playable for i in range(9))
 
 
-    def check_small_board_win(self, board):
-        # Check rows, columns, and diagonals in a single loop
+class LocalBoard(TicTacToeBoard):
+    def __init__(self, index):
+        super().__init__()
+        self.index = index  # The board's index in the local_board_list (from the GlobalBoard class)
+        self.winner = None  # To track the winner of this local board
+        self.playable = True  # Indicates if the board is playable or not
+
+    def has_tic_tac_toe(self, player):
+        """Checks if the local board has a tic-tac-toe for the given player"""
+        if super().has_tic_tac_toe(player):
+            self.winner = player
+            self.playable = False  # Mark the board as not playable
+            return True
+        return False
+
+
+class GlobalBoard(TicTacToeBoard):
+    def __init__(self):
+        super().__init__()
+        self.local_board_list = [LocalBoard(i) for i in range(9)]  # 3x3 grid of local boards
+        self.legal_boards = [board.index for board in self.local_board_list]  # List of legal (playable) boards
+
+    def has_tic_tac_toe(self, player):
+        """Checks if the global board has a tic-tac-toe for the given player"""
+        # Check for horizontal and vertical tic-tac-toe
         for i in range(3):
-            if all(cell == board[i][0] and cell != 0 for cell in board[i]):  # Row win
-                return 1 if board[i][0] == 'X' else -1
-            if all(board[r][i] == board[0][i] and board[r][i] != " " for r in range(3)):  # Column win
-                return board[0][i]
+            if self.local_board_list[i * 3].winner == player and self.local_board_list[i * 3 + 1].winner == player and self.local_board_list[i * 3 + 2].winner == player:
+                return True  # Horizontal tic-tac-toe
+            if self.local_board_list[i].winner == player and self.local_board_list[i + 3].winner == player and self.local_board_list[i + 6].winner == player:
+                return True  # Vertical tic-tac-toe
 
-        # Diagonals
-        if all(board[i][i] == board[0][0] and board[i][i] != " " for i in range(3)):
-            return board[0][0]
-        if all(board[i][2 - i] == board[0][2] and board[i][2 - i] != " " for i in range(3)):
-            return board[0][2]
+        # Check for diagonal tic-tac-toe
+        if self.local_board_list[0].winner == player and self.local_board_list[4].winner == player and self.local_board_list[8].winner == player:
+            return True  # Negative diagonal tic-tac-toe
+        if self.local_board_list[2].winner == player and self.local_board_list[4].winner == player and self.local_board_list[6].winner == player:
+            return True  # Positive diagonal tic-tac-toe
 
-        # Check for tie
-        for row in board:
-            if " " in row:
-                return None
-        return "Tie"
+        return False
 
-    def check_ultimate_board_win(self):
-        board = self.ultimate_board
+    def print_board(self):
+        """Prints the board in the command line"""
+        print()
+        print('-' * 35)
+        print()
 
-        # Check rows
-        for row in board:
-            if row[0] != " " and row[0] == row[1] == row[2]:
-                return row[0]  # Winner!
-
-        # Check columns
-        for col in range(3):
-            if board[0][col] != " " and board[0][col] == board[1][col] == board[2][col]:
-                return board[0][col]  # Winner!
-
-        # Check diagonals
-        if board[0][0] != " " and board[0][0] == board[1][1] == board[2][2]:
-            return board[0][0]  # Winner!
-        if board[2][0] != " " and board[2][0] == board[1][1] == board[0][2]:
-            return board[2][0]  # Winner!
-
-        # Check for tie (no need to explicitly check, if no winner is found)
-        return None  # Game still in progress
-
-    def get_valid_moves(self):
-        print("Inside get_valid_moves")
-        valid_moves = []
-
-        if self.active_board is None:  # First move of the game (anywhere is valid)
-            for board_index in range(9):
-                for row in range(3):
-                    for col in range(3):
-                        if self.small_boards[board_index][row][col] == " ":
-                            valid_moves.append((board_index, row, col))
-            return valid_moves
-
-        # Opponent sent the player to a specific board
-        board = self.small_boards[self.active_board]
-        small_board_winner = self.check_small_board_win(board)
-
-        if small_board_winner is None:  # Board is still in play
+        for i in range(0, 9, 3):
             for row in range(3):
-                for col in range(3):
-                    if board[row][col] == " ":
-                        valid_moves.append((self.active_board, row, col))
-        else:  # Board is already won (player can go anywhere)
-            for board_index in range(9):
-                board = self.small_boards[board_index]
-                if self.check_small_board_win(board) is None:  # Avoid won boards
-                    for row in range(3):
-                        for col in range(3):
-                            if board[row][col] == " ":
-                                valid_moves.append((board_index, row, col))
+                for j in range(3):
+                    print(self.local_board_list[i + j].board[row], end='\t')
+                    if (j + 1) % 3 == 0:
+                        print('|', end='\t')
+                print()
+                if (row + 1) % 3 == 0:
+                    print('-' * 35)
 
-        return valid_moves
+    def mark_global_board(self, local_board, player):
+        """Records when a local board has been won"""
+        row = local_board.index // 3
+        col = local_board.index % 3
+        self.board[row][col] = player
 
+    def update_focus(self, old_row, old_col):
+        """Use the previous move to set the focus of the local boards for the next turn"""
+        # Local board in the same position as the previous guess. May or may not be playable
+        next_lb = self.local_board_list[old_row * 3 + old_col]
 
-    def minimax(self, depth, is_maximizing):
-        game_over = self.check_ultimate_board_win()
-        if game_over is not None:
-            return game_over  # 1 for X win, -1 for O win, 0 for tie
+        # Update the playable status of local boards
+        for local_board in self.local_board_list:
+            # If the board is won by a player or is full, it is not playable
+            if local_board.winner is not None or local_board.is_full():
+                local_board.playable = False
+            # If the board is not won by a player and is not full, it is playable
+            else:
+                local_board.playable = True
 
-        if depth == 0:
-            return self.simple_heuristic()  # Replace 'simple_heuristic' with your actual function
-
-        if is_maximizing:
-            best_score = -float("inf")
-            for move in self.get_valid_moves():
-                self.make_move(*move)
-                score = self.minimax(depth - 1, False)
-                self.undo_move(*move)  # You'll need a function to undo moves
-                best_score = max(best_score, score)
-            return best_score
-        else:  # Minimizing player
-            best_score = float("inf")
-            for move in self.get_valid_moves():
-                self.make_move(*move)
-                score = self.minimax(depth - 1, True)
-                self.undo_move(*move)
-                best_score = min(best_score, score)
-            return best_score
-
-    def simple_heuristic(self):
-        score = 0
-        for board in self.small_boards:
-            winner = self.check_small_board_win(board)
-            if winner == 1:   # If X wins a small board
-                score += 10
-            elif winner == -1:  # If O wins a small board
-                score -= 10
-        return score
-
-    def undo_move(self):
-        if self.move_history:
-            board_index, row, col, player = self.move_history.pop()
-            self.small_boards[board_index][row][col] = 0  # Clear the square
-
-            # Undo ultimate board update
-            if self.ultimate_board[board_index // 3][board_index % 3] != 0:
-                self.ultimate_board[board_index // 3][board_index % 3] = 0
-
-            self.current_player = player  # Restore the previous player
-
-            # Recalculate active board
-            self.active_board = None  # Easiest reset might be to clear and let it be recalculated on the next turn
+        # If the next board is playable, set its focus to True
+        if next_lb.playable:
+            for local_board in self.local_board_list:
+                local_board.focus = False
+            next_lb.focus = True
+        # If the next board is not playable, set all playable boards in focus
         else:
-            print("Error: No moves to undo.")
-            
-def print_board(game):
-    symbols = {0: " ", 1: "X", -1: "O"}  
+            for local_board in self.local_board_list:
+                if local_board.playable:
+                    local_board.focus = True
+                else:
+                    local_board.focus = False
 
-    # Small Boards
-    for board_num, small_board in enumerate(game.small_boards):
-        print(f"Board {board_num + 1}")
-        for row in small_board:
-            print(" | ".join(symbols[cell] for cell in row))
-        if board_num % 3 != 2:
-            print("---+---+---")
 
-    # Ultimate Board
-    print("\nUltimate Board")
-    for row in game.ultimate_board:
-        print(" | ".join(symbols[cell] for cell in row))
-    print()
+class TicTacToeGame:
+    def __init__(self):
+        self.global_board = GlobalBoard()  # Creamos un tablero global
+        self.current_player = 1  # Jugador 1 empieza
+        self.last_move = None  # Último movimiento registrado
 
-def get_human_input():
-    print("Inside get_human_input")
-    while True:
-        try:
-            input_str = input("Enter your move (board, row, col), e.g., 1 2 3: ").split()
-            board_index = int(input_str[0]) - 1
-            row = int(input_str[1]) - 1
-            col = int(input_str[2]) - 1
-            # Ensure the indices are within bounds (you already have validation in 'make_move')
-            if 0 <= board_index <= 8 and 0 <= row <= 2 and 0 <= col <= 2:
-                return board_index, row, col
+    def play(self):
+        while True:
+            self.global_board.print_board()  # Mostramos el tablero
+
+            # Verificamos si el juego ha terminado
+            if self.global_board.has_tic_tac_toe(1):
+                print("¡Jugador 1 gana!")
+                break  # Salir del bucle si el jugador 1 gana globalmente
+            elif self.global_board.has_tic_tac_toe(2):
+                print("¡Jugador 2 gana!")
+                break  # Salir del bucle si el jugador 2 gana globalmente
+            elif self.global_board.check_draw_global():
+                print("¡Empate!")
+                break  # Salir del bucle si hay un empate global
+            # Si el juego no ha terminado, seguimos jugando
             else:
-                print("Invalid input. Please enter values between 1 and 3.")
-        except (ValueError, IndexError):
-            print("Invalid input format. Please enter three numbers separated by spaces.")
+                # Pedimos al jugador actual que haga su movimiento
+                self.make_move()
 
+                # Alternamos el turno de los jugadores
+                self.current_player = 2 if self.current_player == 1 else 1
 
-def main():
-    print("Starting the game!")
-    sys.stdout.flush()  
-    game = GameState()
+    def make_move(self):
+        while True:
+            try:
+                if self.last_move is None or self.global_board.local_board_list[self.last_move].winner or not self.global_board.local_board_list[self.last_move].playable:
+                    # Si es el primer movimiento, el tablero al que te mando tu rival con su jugada anterior se encuentra ganado,
+                    # o el tablero al que te mandó tu rival está completo, el jugador puede elegir cualquier tablero para jugar
+                    print(f"Jugador {self.current_player}, elige un tablero (0-8): ")
+                    local_board_index = int(input())
+                else:
+                    # El jugador debe jugar en el tablero al que apunta el último movimiento del oponente
+                    local_board_index = self.last_move
 
-    while not game.check_ultimate_board_win():  
-        print_board(game) 
-        if game.current_player == "X":  # Human's Turn
-            valid_move = False
-            while not valid_move:
-                try:
-                    board_index, row, col = get_human_input()
-                    game.make_move(board_index, row, col)
-                    valid_move = True
-                except ValueError as e:
-                    print(f"Invalid Move: {e}")
-        else:  # AI's turn
-            best_score = -float("inf")
-            best_move = None
-            for move in game.get_valid_moves():
-                game.make_move(*move)
-                score = game.minimax(depth=4, is_maximizing=True) 
-                game.undo_move(*move) 
-                if score > best_score:
-                    best_score = score
-                    best_move = move
+                if local_board_index not in self.global_board.legal_boards or self.global_board.local_board_list[local_board_index].is_full():
+                    print("El tablero seleccionado no está disponible o está completo. Por favor, elige otro tablero.")
+                    continue
 
-            if best_move: 
-                game.make_move(*best_move)
+                row = int(input(f"Jugador {self.current_player}, elige una fila (0, 1, 2) en el tablero {local_board_index}: "))
+                col = int(input(f"Jugador {self.current_player}, elige una columna (0, 1, 2) en el tablero {local_board_index}: "))
+
+                if 0 <= row < 3 and 0 <= col < 3 and self.global_board.local_board_list[local_board_index].board[row][col] == 0:
+                    # Si la casilla está vacía y dentro del tablero seleccionado
+                    self.global_board.local_board_list[local_board_index].board[row][col] = self.current_player
+                    self.last_move = row * 3 + col  # Actualizar el último movimiento
+
+                    # Comprobamos si el jugador ha ganado el tablero local
+                    if self.global_board.local_board_list[local_board_index].has_tic_tac_toe(self.current_player):
+                        print(f"¡Jugador {self.current_player} ha ganado el tablero {local_board_index}!")
+                        # Eliminamos el tablero de la lista de tableros legales
+                        self.global_board.legal_boards.remove(local_board_index)
+
+                    self.global_board.mark_global_board(self.global_board.local_board_list[local_board_index], self.current_player)
+                    self.update_focus(row, col)  # Actualizar el foco de los tableros locales
+                    break
+                else:
+                    print("Movimiento inválido. Por favor, intenta nuevamente.")
+            except (ValueError, IndexError):
+                print("Entrada inválida. Por favor, intenta nuevamente.")
+
+    def update_focus(self, old_row, old_col):
+        """Use the previous move to set the focus of the local boards for the next turn"""
+        # Local board in the same position as the previous guess. May or may not be playable
+        next_lb = self.global_board.local_board_list[old_row * 3 + old_col]
+
+        # Update the playable status of local boards
+        for local_board in self.global_board.local_board_list:
+            # If the board is won by a player or is full, it is not playable
+            if local_board.winner is not None or local_board.is_full():
+                local_board.playable = False
+            # If the board is not won by a player and is not full, it is playable
             else:
-                print("Error: Minimax could not find a valid move.")
+                local_board.playable = True
 
-    print("Game Over! Winner:", game.check_ultimate_board_win())
+        # If the next board is playable, set its focus to True
+        if next_lb.playable:
+            for local_board in self.global_board.local_board_list:
+                local_board.focus = False
+            next_lb.focus = True
+        # If the next board is not playable, set all playable boards in focus
+        else:
+            for local_board in self.global_board.local_board_list:
+                if local_board.playable:
+                    local_board.focus = True
+                else:
+                    local_board.focus = False
 
-if __name__ == "__main__":
-    main()
+
+# Creamos un juego y lo iniciamos
+game = TicTacToeGame()
+game.play()
